@@ -1,22 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import {
-    FlatList,
-    StyleSheet,
-    Image,
-    Text,
-    View,
-    TextInput,
-    TouchableOpacity,
-    ActivityIndicator,
-    Alert
-} from 'react-native';
+import { FlatList, StyleSheet, Image, Text, View, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useAuthStore } from "@/app/stores/authStore";
 import { useRouter } from 'expo-router';
 import axiosInstance from "@/app/utils/axiosInstance";
 
 export default function HomeScreen() {
     const { token, checkAuth } = useAuthStore();
-    const [sortOrder, setSortOrder] = useState("desc");
     const router = useRouter();
     const [products, setProducts] = useState([]);
     const [filteredProducts, setFilteredProducts] = useState([]);
@@ -27,98 +16,80 @@ export default function HomeScreen() {
 
     // Función para obtener productos
     const fetchProducts = async () => {
-        if (isLoading || !hasMore) return;
+        if (!hasMore || isLoading) return;
 
         setIsLoading(true);
-
         try {
-            const response = await axiosInstance.get(`/products?sort=${sortOrder}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
+            const response = await axiosInstance.get(`/products?limit=15&page=${page}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        const newProducts = response.data;
 
-            const allProducts = response.data;
-            const startIndex = (page - 1) * 15;
-            const endIndex = page * 15;
-            const newProducts = allProducts.slice(startIndex, endIndex);
+        setProducts((prev) => [...prev, ...newProducts]);
+        setFilteredProducts((prev) => [...prev, ...newProducts]);
+        setHasMore(newProducts.length > 0);
+        setPage((prev) => prev + 1);
+    } catch (error) {
+        console.error('Error fetching products:', error);
+    } finally {
+        setIsLoading(false);
+    }
+};
 
-            setProducts((prev) => [...prev, ...newProducts]);
-            setFilteredProducts((prev) => [...prev, ...newProducts]);
+// Filtrar productos localmente
+const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (query === '') {
+        setFilteredProducts(products);
+    } else {
+        const filtered = products.filter((product) =>
+            product.title.toLowerCase().includes(query.toLowerCase())
+        );
+        setFilteredProducts(filtered);
+    }
+};
 
-            setHasMore(newProducts.length > 0);
-            setPage((prev) => prev + 1);
-        } catch (error) {
-            if (error.response?.status === 401) {
-                // Error 401: Token inválido o no autorizado
-                Alert.alert(
-                    "Sesión Expirada",
-                    "Por favor, inicia sesión nuevamente.",
-                    [{ text: "Aceptar", onPress: () => router.replace("/login") }]
-                );
-            } else {
-                // Otros errores
-                Alert.alert(
-                    "Error",
-                    "No se pudieron cargar los productos. Por favor, intenta nuevamente."
-                );
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    // Filtrar productos localmente
-    const handleSearch = (query: string) => {
-        setSearchQuery(query);
-        if (query === '') {
-            setFilteredProducts(products);
-        } else {
-            const filtered = products.filter((product) =>
-                product.title.toLowerCase().includes(query.toLowerCase())
-            );
-            setFilteredProducts(filtered);
-        }
-    };
+// Cargar productos al inicio
+useEffect(() => {
+    checkAuth();
+    fetchProducts();
+}, []);
 
-    // Cargar productos al inicio
-    useEffect(() => {
-        checkAuth();
-        fetchProducts();
-    }, []);
+// Renderizar cada producto
+const renderItem = ({ item }) => (
+    <TouchableOpacity
+        style={styles.productContainer}
+        onPress={() => router.push(`/products/${item.id}`)}
+    >
+        <Image source={{ uri: item.image }} style={styles.productImage} />
+        <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+    </TouchableOpacity>
+);
 
-    // Renderizar cada producto
-    const renderItem = ({ item }) => (
-        <TouchableOpacity
-            style={styles.productContainer}
-            onPress={() => router.push(`/products/${item.id}`)}
-        >
-            <Image source={{ uri: item.image }} style={styles.productImage} />
-            <Text style={styles.productTitle} numberOfLines={2}>{item.title}</Text>
-            <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
-        </TouchableOpacity>
-    );
-
-    return (
-        <View style={styles.screen}>
-            {/* Barra de Búsqueda */}
-            <TextInput
-                style={styles.searchBar}
-                placeholder="Buscar productos..."
-                value={searchQuery}
-                onChangeText={handleSearch}
-            />
-            <FlatList
-                data={filteredProducts}
-                keyExtractor={(item, index) => `${item.id}-${index}`}
-                renderItem={renderItem}
-                contentContainerStyle={styles.listContent}
-                numColumns={2}
-                onEndReached={fetchProducts}
-                onEndReachedThreshold={0.5}
-                ListFooterComponent={isLoading && <ActivityIndicator size="large" color="#000" />}
-            />
-        </View>
-    );
+return (
+    <View style={styles.screen}>
+        {/* Barra de Búsqueda */}
+        <TextInput
+            style={styles.searchBar}
+            placeholder="Buscar productos..."
+            value={searchQuery}
+            onChangeText={handleSearch}
+        />
+        <FlatList
+            data={filteredProducts}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            numColumns={2}
+            onEndReached={fetchProducts}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={isLoading && <ActivityIndicator size="large" color="#000" />}
+        />
+    </View>
+);
 }
 
 const styles = StyleSheet.create({
