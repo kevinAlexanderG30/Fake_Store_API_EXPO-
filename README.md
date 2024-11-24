@@ -12,6 +12,11 @@ Bienvenido al proyecto **Fake Store API App**, una aplicación creada con **Reac
 - **Manejo de Errores**: Redirige al login si la autenticación falla.
 
 ---
+## Usuario de prueba
+username: mor_2314
+password: 83r5^_
+
+
 
 ## 🧰 Librerías Utilizadas
 
